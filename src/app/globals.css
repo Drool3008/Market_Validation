@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+:root {
+  --nf-bg: #141414;
+  --nf-red: #e50914;
+  --nf-text: #ffffff;
+  --nf-muted: #b3b3b3;
+}
+
+@theme inline {
+  --color-nfbg: var(--nf-bg);
+  --color-nfred: var(--nf-red);
+  --color-nfmuted: var(--nf-muted);
+  --font-sans: var(--font-geist-sans);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--nf-bg);
+  color: var(--nf-text);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Hide scrollbars on horizontal rows, Netflix-style. */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
