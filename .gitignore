@@ -47,3 +47,6 @@ next-env.d.ts
 
 # crawler backup of the previous catalog
 /src/data/catalog.seed.json.bak
+
+# Local Netlify folder
+.netlify
