@@ -13,8 +13,12 @@ export interface StoredEvent {
   ts: string;
 }
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+// Prefer a server-only service key (local dev, or hosts that store secrets).
+// Fall back to the public anon key baked in at build via NEXT_PUBLIC_* — for
+// hosts that can't store runtime secrets (e.g. Netlify Free). Anon writes/reads
+// are gated by row-level-security policies on the events table.
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const useSupabase = Boolean(SUPABASE_URL && SUPABASE_KEY);
 
 const LOG_DIR = path.join(process.cwd(), "data");

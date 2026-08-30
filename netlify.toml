@@ -4,6 +4,10 @@
 
 [build.environment]
   NODE_VERSION = "22"
+  # Public Supabase config (anon key is safe to expose; RLS gates writes/reads).
+  # Netlify Free can't store runtime env vars, so these are baked in at build.
+  NEXT_PUBLIC_SUPABASE_URL = "https://bcteqxzaggisegofxzqm.supabase.co"
+  NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjdGVxeHphZ2dpc2Vnb2Z4enFtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4MzQwMzEsImV4cCI6MjEwMzQxMDAzMX0.s176cc9drReh4YqQT82AF1lif6XkHJpiFd-6KlPgU6I"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
