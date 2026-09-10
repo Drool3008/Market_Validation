@@ -71,9 +71,6 @@ export default async function ReportPage() {
           <SegmentTable title="By profile" rows={r.segmentsByProfile} />
           <SegmentTable title="By device" rows={r.segmentsByDevice} />
         </div>
-        <p className="mt-3 text-xs text-white/40">
-          Tier segmentation is pending a tier field on the profile model.
-        </p>
       </section>
 
       <section className="mb-10">
