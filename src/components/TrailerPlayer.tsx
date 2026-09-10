@@ -63,16 +63,28 @@ export default function TrailerPlayer({
   const holder = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
 
-  useEffect(() => {
+  // Reset to the first trailer when the list changes, adjusting state during
+  // render (React's documented pattern) instead of in an effect.
+  const [prevTrailers, setPrevTrailers] = useState(trailers);
+  if (trailers !== prevTrailers) {
+    setPrevTrailers(trailers);
     setIdx(0);
     setFailed(false);
-  }, [trailers]);
+  }
 
   const current = failed ? undefined : trailers[idx];
 
-  function advance() {
+  // Reset load/play state whenever the current video identity changes, again
+  // during render so a new player starts hidden until it is PLAYING.
+  const videoId = `${current?.site ?? ""}:${current?.key ?? ""}`;
+  const [prevVideoId, setPrevVideoId] = useState(videoId);
+  if (videoId !== prevVideoId) {
+    setPrevVideoId(videoId);
     setReady(false);
     setPlaying(false);
+  }
+
+  function advance() {
     if (idx + 1 < trailers.length) setIdx(idx + 1);
     else setFailed(true);
   }
@@ -80,8 +92,6 @@ export default function TrailerPlayer({
   useEffect(() => {
     if (!current || current.site !== "YouTube") return;
     let cancelled = false;
-    setReady(false);
-    setPlaying(false);
     loadApi().then(() => {
       if (cancelled || !holder.current || !window.YT) return;
       playerRef.current = new window.YT.Player(holder.current, {

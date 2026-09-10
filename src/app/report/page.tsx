@@ -1,5 +1,5 @@
 import { readEvents, storeBackend } from "@/lib/events-store";
-import { buildReport } from "@/lib/report";
+import { buildReport, type Segment } from "@/lib/report";
 
 // Internal validation dashboard. Reads the event store live on each request.
 export const dynamic = "force-dynamic";
@@ -61,6 +61,19 @@ export default async function ReportPage() {
         <Stat label="Generic CTR" value={`${(r.genericCTR * 100).toFixed(0)}%`} />
         <Stat label="CTR ratio" value={`${r.ctrRatio.toFixed(2)}x`} />
         <Stat label="Median dwell" value={`${r.medianDwellSec}s`} />
+        <Stat label="Median bounce" value={`${r.medianBounceSec}s`} />
+        <Stat label="Bounce rate" value={`${(r.bounceRate * 100).toFixed(0)}%`} />
+      </section>
+
+      <section className="mb-10">
+        <h2 className="mb-3 font-semibold">Segments</h2>
+        <div className="grid gap-6 sm:grid-cols-2">
+          <SegmentTable title="By profile" rows={r.segmentsByProfile} />
+          <SegmentTable title="By device" rows={r.segmentsByDevice} />
+        </div>
+        <p className="mt-3 text-xs text-white/40">
+          Tier segmentation is pending a tier field on the profile model.
+        </p>
       </section>
 
       <section className="mb-10">
@@ -96,6 +109,34 @@ function Stat({ label, value }: { label: string; value: string }) {
     <div className="rounded-lg bg-white/5 p-4">
       <p className="text-xs text-white/50">{label}</p>
       <p className="text-2xl font-bold">{value}</p>
+    </div>
+  );
+}
+
+function SegmentTable({ title, rows }: { title: string; rows: Segment[] }) {
+  return (
+    <div>
+      <h3 className="mb-2 text-sm font-semibold text-white/70">{title}</h3>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs text-white/50">
+            <th className="pb-1 font-medium">Segment</th>
+            <th className="pb-1 text-right font-medium">Sessions</th>
+            <th className="pb-1 text-right font-medium">CTR</th>
+            <th className="pb-1 text-right font-medium">Dwell</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((s) => (
+            <tr key={s.key} className="border-t border-white/5">
+              <td className="py-1.5">{s.key}</td>
+              <td className="py-1.5 text-right">{s.sessions}</td>
+              <td className="py-1.5 text-right">{(s.featureCTR * 100).toFixed(0)}%</td>
+              <td className="py-1.5 text-right">{s.medianDwellSec}s</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

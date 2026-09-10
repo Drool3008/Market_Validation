@@ -42,6 +42,9 @@ export default function TitleCard({
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
+    // SSR-safe portal guard: flip mounted after the client mount so createPortal
+    // only runs in the browser.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
     return () => {
       clearTimeout(enterTimer.current);
@@ -53,6 +56,9 @@ export default function TitleCard({
   // Close: fade+shrink out, then unmount after the transition finishes.
   useEffect(() => {
     if (preview) {
+      // Mount, then grow+fade in on the next frame. This enter/exit sequencing is
+      // effect-driven by design.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRender(true);
       const r = requestAnimationFrame(() => setEntered(true));
       return () => cancelAnimationFrame(r);

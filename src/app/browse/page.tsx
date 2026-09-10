@@ -50,6 +50,9 @@ export default function Browse() {
       return;
     }
     enteredAt.current = Date.now();
+    // Profile is a client-only value read from localStorage after mount, so this
+    // setState-in-effect is the intended external sync (see note above).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setProfile(p);
     setReady(true);
     track("home_view", { profileId: p.id });

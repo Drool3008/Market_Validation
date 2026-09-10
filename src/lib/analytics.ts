@@ -28,10 +28,10 @@ function uuid(): string {
 
 export function getSessionId(): string {
   if (typeof window === "undefined") return "server";
-  let id = localStorage.getItem(SESSION_KEY);
+  let id = sessionStorage.getItem(SESSION_KEY);
   if (!id) {
     id = uuid();
-    localStorage.setItem(SESSION_KEY, id);
+    sessionStorage.setItem(SESSION_KEY, id);
   }
   return id;
 }
@@ -58,7 +58,6 @@ export function track(
     payload,
     ts: new Date().toISOString(),
   };
-  // eslint-disable-next-line no-console
   console.debug("[event]", type, payload);
   void fetch("/api/events", {
     method: "POST",

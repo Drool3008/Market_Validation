@@ -24,19 +24,26 @@ function WatchInner() {
 
   const startT = Number(search.get("t") ?? 0);
   const [pos, setPos] = useState(startT);
+  const [prevStartT, setPrevStartT] = useState(startT);
 
   const heat = useMemo(
     () => (episode ? generateHeatmap(episode.id, episode.runtime) : null),
     [episode],
   );
 
-  useEffect(() => {
+  // Re-sync the playhead when the URL start time changes. Adjusting state during
+  // render (not in an effect) avoids a cascading re-render.
+  if (startT !== prevStartT) {
+    setPrevStartT(startT);
     setPos(startT);
+  }
+
+  useEffect(() => {
     const id = setInterval(() => {
       setPos((p) => (heat ? Math.min(heat.runtimeSec, p + 1) : p));
     }, 1000);
     return () => clearInterval(id);
-  }, [startT, heat]);
+  }, [heat]);
 
   if (!episode || !show || !heat) {
     return (
