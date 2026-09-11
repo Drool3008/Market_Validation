@@ -12,11 +12,14 @@ export default function FinishFeedback() {
   const [sid, setSid] = useState<string | null>(null);
 
   // Session id lives in sessionStorage (client-only), so read after mount to
-  // avoid a hydration mismatch. Intended external sync (matches Browse).
+  // avoid a hydration mismatch. Skip on /survey/* so we never mint an id before
+  // the pre survey's ?sid= seeds it; re-read on each navigation so the link
+  // reflects the live (seeded) id rather than a stale mount-time value.
   useEffect(() => {
+    if (pathname.startsWith("/survey")) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSid(getSessionId());
-  }, []);
+  }, [pathname]);
 
   if (!sid || pathname.startsWith("/survey")) return null;
 

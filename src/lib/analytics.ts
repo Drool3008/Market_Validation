@@ -30,20 +30,23 @@ export function getSessionId(): string {
   if (typeof window === "undefined") return "server";
   let id = sessionStorage.getItem(SESSION_KEY);
   if (!id) {
-    id = uuid();
+    // Honor the survey's ?sid= on prototype entry so events join the pre/post
+    // rows no matter which component reads the id first (avoids an effect-order
+    // race between ProfileGate and shared-layout components like FinishFeedback).
+    id = new URLSearchParams(window.location.search).get("sid") || uuid();
     sessionStorage.setItem(SESSION_KEY, id);
   }
   return id;
 }
 
 // Seed the session id from the survey's ?sid= so events.session_id joins the
-// pre/post survey rows. Only seeds when unset, so it never clobbers an id mid-session.
-// Call this before the first track()/getSessionId() on a prototype entry page.
+// pre/post survey rows. The URL sid is authoritative on prototype entry, so it
+// OVERWRITES any id a shared-layout component (e.g. FinishFeedback -> getSessionId)
+// may have minted first while still on /survey/pre. Only ProfileGate calls this,
+// and only when ?sid= is present, so it can't clobber a genuine mid-session id.
 export function seedSessionId(sid: string): void {
   if (typeof window === "undefined" || !sid) return;
-  if (!sessionStorage.getItem(SESSION_KEY)) {
-    sessionStorage.setItem(SESSION_KEY, sid);
-  }
+  sessionStorage.setItem(SESSION_KEY, sid);
 }
 
 export function getProfileId(): string | null {
