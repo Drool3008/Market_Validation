@@ -44,6 +44,7 @@ export default function GridView({
               item={item}
               rowId={sourcePrefix}
               onSelect={handleSelect}
+              fill
             />
           ))}
         </div>

@@ -74,6 +74,76 @@ export default async function ReportPage() {
       </section>
 
       <section className="mb-10">
+        <h2 className="mb-3 font-semibold">Path comparison — WWYE vs normal browsing</h2>
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-white/70">Funnel by path</h3>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-white/50">
+                  <th className="pb-1 font-medium">Step</th>
+                  <th className="pb-1 text-right font-medium">WWYE</th>
+                  <th className="pb-1 text-right font-medium">Browse</th>
+                </tr>
+              </thead>
+              <tbody>
+                {r.pathComparison.funnel.map((f) => (
+                  <tr key={f.label} className="border-t border-white/5">
+                    <td className="py-1.5">{f.label}</td>
+                    <td className="py-1.5 text-right">{f.wwye}</td>
+                    <td className="py-1.5 text-right">{f.browse}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-white/70">Per-session medians</h3>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-white/50">
+                  <th className="pb-1 font-medium">Metric</th>
+                  <th className="pb-1 text-right font-medium">WWYE</th>
+                  <th className="pb-1 text-right font-medium">Browse</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-white/5">
+                  <td className="py-1.5">Time to first play</td>
+                  <td className="py-1.5 text-right">{sec(r.pathComparison.timeToFirstPlaySec.wwye)}</td>
+                  <td className="py-1.5 text-right">{sec(r.pathComparison.timeToFirstPlaySec.browse)}</td>
+                </tr>
+                <tr className="border-t border-white/5">
+                  <td className="py-1.5">Tiles opened before start</td>
+                  <td className="py-1.5 text-right">{num(r.pathComparison.tilesBeforeStart.wwye)}</td>
+                  <td className="py-1.5 text-right">{num(r.pathComparison.tilesBeforeStart.browse)}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="mt-3 text-xs text-white/50">
+              Tiles opened before start (all sessions):{" "}
+              <span className="text-white/70">{num(r.pathComparison.tilesBeforeStart.overall)}</span>
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <Stat
+            label="Give-up rate"
+            value={`${(r.pathComparison.giveUpRate * 100).toFixed(0)}%`}
+          />
+          <Stat
+            label="Gave up / saw home"
+            value={`${r.pathComparison.giveUpSessions} / ${r.pathComparison.sessionsWithHome}`}
+          />
+        </div>
+        <p className="mt-2 text-xs text-white/40">
+          Per-session metrics attribute to the path of that session&apos;s first
+          play. Give-up = saw home but never pressed play. Rows lacking a path are
+          counted as browse.
+        </p>
+      </section>
+
+      <section className="mb-10">
         <h2 className="mb-3 font-semibold">Pass / fail against thresholds</h2>
         <ul className="space-y-2">
           {r.checks.map((c) => (
@@ -99,6 +169,14 @@ export default async function ReportPage() {
       </p>
     </main>
   );
+}
+
+// Nullable medians render "-" so "no sessions" reads differently from a real 0.
+function sec(v: number | null): string {
+  return v === null ? "-" : `${v}s`;
+}
+function num(v: number | null): string {
+  return v === null ? "-" : `${v}`;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {

@@ -12,6 +12,7 @@ import {
   itemsByKind,
 } from "@/data/catalog";
 import { continueWatching } from "@/lib/feature";
+import { getMyList, subscribe } from "@/lib/prefs";
 import { getProfileId, track } from "@/lib/analytics";
 import { MuteProvider } from "@/components/MuteContext";
 import Navbar from "@/components/Navbar";
@@ -55,6 +56,7 @@ export default function Browse() {
 
   const [view, setView] = useState<View>("home");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [myList, setMyList] = useState<CatalogItem[]>([]);
 
   const featureEngaged = useRef(false);
   const enteredAt = useRef(0);
@@ -84,6 +86,21 @@ export default function Browse() {
     window.addEventListener("pagehide", onLeave);
     return () => window.removeEventListener("pagehide", onLeave);
   }, [router]);
+
+  // My List is localStorage-backed: read after mount and stay in sync when a ＋
+  // toggle elsewhere fires prefs.subscribe().
+  useEffect(() => {
+    const load = () =>
+      setMyList(
+        getMyList()
+          .map((id) => bestEpisodeForShow(id))
+          .filter((e): e is NonNullable<typeof e> => Boolean(e))
+          .map((e) => toCatalogItem(e))
+          .filter((c): c is CatalogItem => Boolean(c)),
+      );
+    load();
+    return subscribe(load);
+  }, []);
 
   if (!ready || !profile) return null;
 
@@ -116,6 +133,7 @@ export default function Browse() {
               rowId="continue-watching"
               title="Continue Watching"
               items={continueWatching(profile)}
+              showProgress
               onSelect={handleSelect}
             />
 
@@ -126,6 +144,13 @@ export default function Browse() {
               rowId="trending"
               title="Trending Now"
               items={trendingItems()}
+              onSelect={handleSelect}
+            />
+            <Row
+              rowId="top10"
+              title="Top 10 Today"
+              items={trendingItems().slice(0, 10)}
+              numbered
               onSelect={handleSelect}
             />
             <Row
@@ -172,7 +197,7 @@ export default function Browse() {
       ) : (
         <GridView
           title="My List"
-          items={[]}
+          items={myList}
           onSelect={handleSelect}
           sourcePrefix="browse-mylist"
           emptyText="Your list is empty. Add titles with the ＋ button."

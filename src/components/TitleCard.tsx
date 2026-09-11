@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CatalogItem } from "@/data/types";
 import { track, pathFor } from "@/lib/analytics";
+import { inMyList, toggleMyList, getRating, setRating, subscribe } from "@/lib/prefs";
 import { itemLabel, showTrailers } from "@/lib/display";
 import TrailerPlayer from "./TrailerPlayer";
 import MuteButton from "./MuteButton";
@@ -22,10 +23,14 @@ export default function TitleCard({
   item,
   rowId,
   onSelect,
+  showProgress = false,
+  fill = false,
 }: {
   item: CatalogItem;
   rowId: string;
   onSelect: (item: CatalogItem, source: string) => void;
+  showProgress?: boolean;
+  fill?: boolean;
 }) {
   const { show, episode } = item;
   const label = itemLabel(item);
@@ -41,6 +46,20 @@ export default function TitleCard({
   const [entered, setEntered] = useState(false); // drives the scale/opacity
   const [rect, setRect] = useState<DOMRect | null>(null);
   const [mounted, setMounted] = useState(false);
+
+  // My List / like state for the popover quick-actions, kept live via subscribe()
+  // so a toggle here (or in the modal) reflects everywhere without a reload.
+  const [inList, setInList] = useState(false);
+  const [liked, setLiked] = useState(false);
+  useEffect(() => {
+    const sync = () => {
+      setInList(inMyList(show.id));
+      setLiked(getRating(show.id) === "up");
+    };
+    sync(); // hydrate from storage after mount (SSR renders default false)
+    return subscribe(sync);
+  }, [show.id]);
+
   useEffect(() => {
     // SSR-safe portal guard: flip mounted after the client mount so createPortal
     // only runs in the browser.
@@ -123,7 +142,9 @@ export default function TitleCard({
         onMouseEnter={onTileEnter}
         onMouseLeave={scheduleClose}
         onClick={() => onSelect(item, rowId)}
-        className="group relative aspect-video w-44 shrink-0 overflow-hidden rounded-lg text-left sm:w-56 md:w-64"
+        className={`group relative aspect-video overflow-hidden rounded-lg text-left ${
+          fill ? "w-full" : "w-44 shrink-0 sm:w-56 md:w-64"
+        }`}
         style={{ background: `linear-gradient(135deg, ${show.color} 0%, #0b0b0b 120%)` }}
       >
         {artUrl && (
@@ -135,6 +156,11 @@ export default function TitleCard({
           <span className="text-sm font-bold leading-tight drop-shadow">{label.primary}</span>
           <span className="mt-0.5 text-[11px] text-white/70">{label.secondary}</span>
         </div>
+        {showProgress && (
+          <div className="absolute inset-x-0 bottom-0 h-1 bg-white/25">
+            <div className="h-full bg-nfred" style={{ width: `${prog.frac * 100}%` }} />
+          </div>
+        )}
       </button>
 
       {mounted &&
@@ -175,8 +201,44 @@ export default function TitleCard({
                 >
                   ▶
                 </button>
-                <IconBtn label="Add to list">+</IconBtn>
-                <IconBtn label="Like">♥</IconBtn>
+                <button
+                  aria-label={inList ? "Remove from My List" : "Add to My List"}
+                  aria-pressed={inList}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const added = toggleMyList(show.id);
+                    track(added ? "mylist_add" : "mylist_remove", {
+                      showId: show.id,
+                      episodeId: episode.id,
+                      path: pathFor(rowId),
+                    });
+                  }}
+                  className={`grid h-9 w-9 place-items-center rounded-full border text-sm ${
+                    inList ? "border-white bg-white text-black" : "border-white/40 hover:border-white"
+                  }`}
+                >
+                  {inList ? "✓" : "+"}
+                </button>
+                <button
+                  aria-label="Like"
+                  aria-pressed={liked}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const next = liked ? null : "up";
+                    setRating(show.id, next);
+                    track("rating", {
+                      showId: show.id,
+                      value: next,
+                      episodeId: episode.id,
+                      path: pathFor(rowId),
+                    });
+                  }}
+                  className={`grid h-9 w-9 place-items-center rounded-full border text-sm ${
+                    liked ? "border-white bg-white text-black" : "border-white/40 hover:border-white"
+                  }`}
+                >
+                  ♥
+                </button>
                 <button
                   onClick={() => onSelect(item, rowId)}
                   aria-label="More info"
@@ -201,17 +263,5 @@ export default function TitleCard({
           document.body,
         )}
     </>
-  );
-}
-
-function IconBtn({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <button
-      aria-label={label}
-      onClick={(e) => e.stopPropagation()}
-      className="grid h-9 w-9 place-items-center rounded-full border border-white/40 text-sm hover:border-white"
-    >
-      {children}
-    </button>
   );
 }

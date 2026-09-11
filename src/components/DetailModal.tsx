@@ -6,6 +6,8 @@ import type { CatalogItem, Episode } from "@/data/types";
 import { ALL_MOODS } from "@/data/types";
 import { episodesForShow } from "@/data/catalog";
 import { track, pathFor } from "@/lib/analytics";
+import { inMyList, toggleMyList, getRating, setRating, subscribe } from "@/lib/prefs";
+import type { Thumb } from "@/lib/prefs";
 import { itemLabel } from "@/lib/display";
 import { generateHeatmap } from "@/lib/heatmap";
 import HeatmapScrubber from "./HeatmapScrubber";
@@ -35,6 +37,22 @@ export default function DetailModal({
       path: pathFor(selection.source),
     });
   }, [selection]);
+
+  // My List / rating state for the normal-branch buttons, kept live via subscribe()
+  // so toggles here reflect on cards elsewhere (and vice-versa). Hooks must run
+  // before the early return, so key off the nullable showId.
+  const showId = selection?.item.show.id;
+  const [inList, setInList] = useState(false);
+  const [rating, setRatingState] = useState<Thumb | null>(null);
+  useEffect(() => {
+    if (!showId) return;
+    const sync = () => {
+      setInList(inMyList(showId));
+      setRatingState(getRating(showId));
+    };
+    sync(); // hydrate from storage after mount (SSR renders defaults)
+    return subscribe(sync);
+  }, [showId]);
 
   if (!selection) return null;
   const { item, source } = selection;
@@ -152,23 +170,60 @@ export default function DetailModal({
                   ▶ Play
                 </button>
                 <button
-                  aria-label="Add to My List"
-                  onClick={(e) => e.stopPropagation()}
-                  className="grid h-10 w-10 place-items-center rounded-full border border-white/40 text-lg hover:border-white"
+                  aria-label={inList ? "Remove from My List" : "Add to My List"}
+                  aria-pressed={inList}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const added = toggleMyList(show.id);
+                    track(added ? "mylist_add" : "mylist_remove", {
+                      showId: show.id,
+                      episodeId: episode.id,
+                      path: pathFor(source),
+                    });
+                  }}
+                  className={`grid h-10 w-10 place-items-center rounded-full border text-lg ${
+                    inList ? "border-white bg-white text-black" : "border-white/40 hover:border-white"
+                  }`}
                 >
-                  ＋
+                  {inList ? "✓" : "＋"}
                 </button>
                 <button
                   aria-label="Rate thumbs up"
-                  onClick={(e) => e.stopPropagation()}
-                  className="grid h-10 w-10 place-items-center rounded-full border border-white/40 text-sm hover:border-white"
+                  aria-pressed={rating === "up"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const next = rating === "up" ? null : "up";
+                    setRating(show.id, next);
+                    track("rating", {
+                      showId: show.id,
+                      value: next,
+                      episodeId: episode.id,
+                      path: pathFor(source),
+                    });
+                  }}
+                  className={`grid h-10 w-10 place-items-center rounded-full border text-sm ${
+                    rating === "up" ? "border-white bg-white text-black" : "border-white/40 hover:border-white"
+                  }`}
                 >
                   👍
                 </button>
                 <button
                   aria-label="Rate thumbs down"
-                  onClick={(e) => e.stopPropagation()}
-                  className="grid h-10 w-10 place-items-center rounded-full border border-white/40 text-sm hover:border-white"
+                  aria-pressed={rating === "down"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const next = rating === "down" ? null : "down";
+                    setRating(show.id, next);
+                    track("rating", {
+                      showId: show.id,
+                      value: next,
+                      episodeId: episode.id,
+                      path: pathFor(source),
+                    });
+                  }}
+                  className={`grid h-10 w-10 place-items-center rounded-full border text-sm ${
+                    rating === "down" ? "border-white bg-white text-black" : "border-white/40 hover:border-white"
+                  }`}
                 >
                   👎
                 </button>
