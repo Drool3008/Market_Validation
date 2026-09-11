@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { PROFILES } from "@/data/profiles";
 import type { DemoProfile } from "@/data/types";
-import { track, setProfileId, getSessionId } from "@/lib/analytics";
+import { track, setProfileId, getSessionId, seedSessionId } from "@/lib/analytics";
 
 // Netflix "Who's watching?" gate. The profiles are the demo personas that
 // simulate watch history (see README section 9).
@@ -12,6 +12,15 @@ export default function ProfileGate() {
   const router = useRouter();
 
   useEffect(() => {
+    // Seed the session id from the survey's ?sid= before any event fires, so
+    // events.session_id joins the pre/post survey rows. If missing, getSessionId
+    // mints one and we warn: this visitor is unjoinable to a survey.
+    const sid = new URLSearchParams(window.location.search).get("sid");
+    if (sid) {
+      seedSessionId(sid);
+    } else {
+      console.warn("[survey] no ?sid= on prototype entry; unjoinable participant");
+    }
     getSessionId();
     track("session_start", { ua: navigator.userAgent, w: window.innerWidth });
   }, []);

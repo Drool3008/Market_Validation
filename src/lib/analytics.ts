@@ -36,6 +36,16 @@ export function getSessionId(): string {
   return id;
 }
 
+// Seed the session id from the survey's ?sid= so events.session_id joins the
+// pre/post survey rows. Only seeds when unset, so it never clobbers an id mid-session.
+// Call this before the first track()/getSessionId() on a prototype entry page.
+export function seedSessionId(sid: string): void {
+  if (typeof window === "undefined" || !sid) return;
+  if (!sessionStorage.getItem(SESSION_KEY)) {
+    sessionStorage.setItem(SESSION_KEY, sid);
+  }
+}
+
 export function getProfileId(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(PROFILE_KEY);

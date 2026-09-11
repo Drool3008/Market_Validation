@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { getEpisode, getShow } from "@/data/catalog";
 import { generateHeatmap, formatTime } from "@/lib/heatmap";
+import { getSessionId } from "@/lib/analytics";
 
 // Mock player. No real video (README s.4) -- we measure intent and browse, not
 // watching. A moving playhead over the heatmap sells "it's playing".
@@ -25,6 +26,8 @@ function WatchInner() {
   const startT = Number(search.get("t") ?? 0);
   const [pos, setPos] = useState(startT);
   const [prevStartT, setPrevStartT] = useState(startT);
+  // Session id is client-only (sessionStorage); read after mount for the post-survey link.
+  const [sid, setSid] = useState<string | null>(null);
 
   const heat = useMemo(
     () => (episode ? generateHeatmap(episode.id, episode.runtime) : null),
@@ -37,6 +40,13 @@ function WatchInner() {
     setPrevStartT(startT);
     setPos(startT);
   }
+
+  // Session id is client-only (sessionStorage); read after mount to avoid a
+  // hydration mismatch. Intended external sync (matches Browse).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSid(getSessionId());
+  }, []);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -90,6 +100,14 @@ function WatchInner() {
         <p className="mt-2 text-sm text-white/40">
           {startT > 0 ? `Started at the most-loved moment · ${formatTime(startT)}` : "Playing from the start"}
         </p>
+        {sid && (
+          <a
+            href={`/survey/post?sid=${sid}`}
+            className="mt-6 rounded-full bg-nfred px-5 py-2 text-sm font-semibold text-white transition hover:bg-nfred/90"
+          >
+            Finish &amp; give feedback
+          </a>
+        )}
       </div>
 
       <div className="px-6 pb-10">
