@@ -18,6 +18,48 @@ reporting on it.
 
 ---
 
+## Quickstart
+
+Prerequisites: **Node 22** (see `.nvmrc`), **pnpm 11** (`corepack enable`).
+
+```bash
+pnpm install
+cp .env.local.example .env.local    # then fill in values (see table below)
+pnpm dev                            # http://localhost:3000
+```
+
+Walk the full participant flow from `http://localhost:3000/survey/pre`.
+
+**Environment (`.env.local`):**
+
+| Var | Needed for | Notes |
+|---|---|---|
+| `SUPABASE_URL` | events + survey storage | Supabase project URL. Blank → events fall back to `data/events.jsonl`; surveys no-op. |
+| `SUPABASE_SERVICE_KEY` | events + survey storage | `service_role` key, **server-only** — never expose to the browser. |
+| `TMDB_BEARER` | catalog crawler only | Only for re-running `pnpm crawl`. The catalog is baked into the repo, so the app runs without it. |
+
+**Commands:**
+
+| Command | Does |
+|---|---|
+| `pnpm dev` | Run locally with hot reload |
+| `pnpm build` | Production build |
+| `pnpm start` | Serve the production build |
+| `pnpm lint` | ESLint |
+| `pnpm crawl` | Re-scrape the catalog (offline, one-shot; needs `TMDB_BEARER`) |
+
+**Database:** apply the migrations in `supabase/migrations/` — `0001_events.sql` then
+`0002_survey_responses.sql` — in the Supabase SQL editor, in order.
+
+**Deploy:** hosted on **Vercel** (project `market-validation`). Push to `main`
+auto-deploys. Set `SUPABASE_URL` + `SUPABASE_SERVICE_KEY` in the Vercel project env.
+Smoke test after deploy: `/report` shows `store: supabase`.
+
+**Key routes:** `/survey/pre` · `/` (prototype) · `/browse` · `/watch/[episodeId]` ·
+`/survey/post` · `/survey/thanks` · `/report` · `/api/events` · `/api/survey`.
+
+---
+
 ## Table of Contents
 
 1. [The Hypothesis](#1-the-hypothesis)
@@ -36,6 +78,7 @@ reporting on it.
 14. [Tech Stack & Why](#14-tech-stack--why)
 15. [Repo Structure](#15-repo-structure)
 16. [Legal & Ethics](#16-legal--ethics)
+17. [Participant Task Flow & Survey](#17-participant-task-flow--survey)
 
 ---
 
@@ -478,8 +521,57 @@ Structure is indicative; it will settle during Phase 0-1.
 
 ---
 
+## 17. Participant Task Flow & Survey
+
+A participant moves through three linked steps, all joined by a single `session_id`
+so **stated** answers (survey) can be cross-checked against **revealed** behavior
+(events):
+
+```
+/survey/pre  →  prototype (/?sid=…)  →  /survey/post?sid=…  →  /survey/thanks
+```
+
+1. **Pre survey (`/survey/pre`)** — consent notice + problem-validation questions
+   (config lives in `src/lib/survey.ts`). On first load it mints a `session_id`
+   (UUID v4). Required-field and "slider must be moved" validation gate the submit
+   button until the form is complete.
+   - **Screening:** certain answers (e.g. under 18, never watches during a meal) end
+     the study early with a polite message and save the response with
+     `screened_out = true`. The prototype is not reachable from there.
+2. **Prototype (`/?sid=<session_id>`)** — the Netflix clone. The `sid` from the URL
+   seeds the client session so every `events` row logs under that same id. The
+   participant picks a profile, browses, and can open the mock player. An
+   always-available **"Finish & give feedback"** button links to the post survey, so
+   participants who abandon before the player still reach it.
+3. **Post survey (`/survey/post?sid=…`)** — solution-validation questions, then
+   `/survey/thanks`.
+
+**Storage & join.** Pre/post responses go to the `survey_responses` table (via
+`/api/survey`); prototype events go to `events` (via `/api/events`). All three carry
+the same `session_id`, so one participant's pre answers, in-app behavior, and post
+answers join on that key. The survey is fully **config-driven**: add or edit a
+question by editing `src/lib/survey.ts` only — one `SurveyForm` component renders
+every type (radio / checkbox / slider / textarea).
+
+> **Session-id integrity is load-bearing.** The whole study depends on the three
+> datasets joining. After touching `src/lib/analytics.ts`,
+> `src/components/FinishFeedback.tsx`, or the `sid` logic in `src/app/page.tsx`,
+> re-walk the full flow in a browser and confirm one `session_id` shows up in
+> `survey_responses` (pre + post) **and** `events`. Build/lint/API smoke tests do
+> not catch a broken join.
+
+---
+
 ## Status
 
-Planning complete. Next step: lock the [Section 5](#5-success-metrics--the-actual-test)
-thresholds and the [Section 12](#12-open-questions--risks) open decisions with the
-user, then start Phase 0.
+**Built and deployed.** The Netflix-clone prototype, the "Watch While You Eat"
+feature, event instrumentation, the pre/post survey flow, and the `/report` view are
+live on **Vercel** (project `market-validation`), backed by **Supabase**. The
+participant flow is verified end-to-end — pre + events + post join on one
+`session_id`.
+
+Still open before recruiting testers: lock the
+[Section 5](#5-success-metrics--the-actual-test) success thresholds (`X%`,
+`Y seconds`, CTR multiple) and the remaining
+[Section 12](#12-open-questions--risks) decisions (feature-row placement, final demo
+profile / catalog set, recruitment).
