@@ -14,7 +14,22 @@ export type EventType =
   | "scrubber_interact"
   | "play_click"
   | "feature_dwell"
-  | "bounce";
+  | "bounce"
+  | "nav_click"
+  | "search_query"
+  | "search_result_click"
+  | "mylist_add"
+  | "mylist_remove"
+  | "rating";
+
+// Which experience path an interaction belongs to, for the WWYE-vs-normal
+// comparison in the report. The feature row uses source "watch-while-you-eat";
+// everything else (other rows, nav, search, hero) is normal browsing.
+export type ExperiencePath = "wwye" | "browse";
+
+export function pathFor(source: string): ExperiencePath {
+  return source === "watch-while-you-eat" ? "wwye" : "browse";
+}
 
 const SESSION_KEY = "wwye_session";
 const PROFILE_KEY = "wwye_profile";

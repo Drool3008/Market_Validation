@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CatalogItem } from "@/data/types";
-import { track } from "@/lib/analytics";
+import { track, pathFor } from "@/lib/analytics";
 import { itemLabel, showTrailers } from "@/lib/display";
 import TrailerPlayer from "./TrailerPlayer";
 import MuteButton from "./MuteButton";
@@ -88,7 +88,7 @@ export default function TitleCard({
   function open() {
     if (tileRef.current) setRect(tileRef.current.getBoundingClientRect());
     setPreview(true);
-    track("card_hover", { showId: show.id, episodeId: episode.id, rowId });
+    track("card_hover", { showId: show.id, episodeId: episode.id, rowId, path: pathFor(rowId) });
   }
   function onTileEnter() {
     clearTimeout(leaveTimer.current);

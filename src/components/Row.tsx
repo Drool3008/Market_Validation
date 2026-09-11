@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import type { CatalogItem } from "@/data/types";
-import { track } from "@/lib/analytics";
+import { track, pathFor } from "@/lib/analytics";
 import TitleCard from "./TitleCard";
 
 // A horizontal catalog row. Fires row_impression once when scrolled into view,
@@ -46,7 +46,12 @@ export default function Row({
   }, [rowId, isFeature, items.length]);
 
   function handleSelect(item: CatalogItem, source: string) {
-    track("row_click", { rowId, isFeature, episodeId: item.episode.id });
+    track("row_click", {
+      rowId,
+      isFeature,
+      episodeId: item.episode.id,
+      path: pathFor(source),
+    });
     onSelect(item, source);
   }
 

@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { CatalogItem } from "@/data/types";
+import type { CatalogItem, Episode } from "@/data/types";
 import { ALL_MOODS } from "@/data/types";
-import { track } from "@/lib/analytics";
+import { episodesForShow } from "@/data/catalog";
+import { track, pathFor } from "@/lib/analytics";
 import { itemLabel } from "@/lib/display";
 import { generateHeatmap } from "@/lib/heatmap";
 import HeatmapScrubber from "./HeatmapScrubber";
 
 const MOOD_LABEL = Object.fromEntries(ALL_MOODS.map((m) => [m.id, m.label]));
 
-// Netflix-style detail overlay with the "start anywhere" choice.
+// Netflix-style detail overlay. The "start anywhere" best-moment experience
+// (peak button + heatmap) is EXCLUSIVE to the Watch While You Eat feature; normal
+// browsing gets a standard details modal so it reads as a clean control.
 export default function DetailModal({
   selection,
   onClose,
@@ -29,6 +32,7 @@ export default function DetailModal({
       showId: selection.item.show.id,
       episodeId: selection.item.episode.id,
       source: selection.source,
+      path: pathFor(selection.source),
     });
   }, [selection]);
 
@@ -42,6 +46,7 @@ export default function DetailModal({
       track("feature_dwell", {
         episodeId: episode.id,
         ms: Date.now() - openedAt.current,
+        path: pathFor(source),
       });
     }
     onClose();
@@ -54,7 +59,13 @@ export default function DetailModal({
         : from === "peak"
           ? generateHeatmap(episode.id, episode.runtime).peakT
           : from;
-    track("play_click", { episodeId: episode.id, from, t, source });
+    track("play_click", {
+      episodeId: episode.id,
+      from,
+      t,
+      source,
+      path: pathFor(source),
+    });
     router.push(`/watch/${episode.id}?t=${t}`);
   }
 
@@ -107,29 +118,170 @@ export default function DetailModal({
 
           <p className="text-sm text-white/85">{episode.synopsis}</p>
 
-          <div className="flex gap-3">
-            <button
-              onClick={() => play("start")}
-              className="rounded bg-white px-5 py-2 font-semibold text-black hover:bg-white/85"
-            >
-              ▶ Start from Beginning
-            </button>
-            <button
-              onClick={() => play("peak")}
-              className="rounded bg-nfred px-5 py-2 font-semibold hover:bg-nfred/85"
-            >
-              ▶ Jump to the Best Moment
-            </button>
-          </div>
+          {fromFeature ? (
+            <>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => play("start")}
+                  className="rounded bg-white px-5 py-2 font-semibold text-black hover:bg-white/85"
+                >
+                  ▶ Start from Beginning
+                </button>
+                <button
+                  onClick={() => play("peak")}
+                  className="rounded bg-nfred px-5 py-2 font-semibold hover:bg-nfred/85"
+                >
+                  ▶ Jump to the Best Moment
+                </button>
+              </div>
 
-          <div>
-            <p className="mb-2 text-xs uppercase tracking-wide text-white/50">
-              Most-loved moments · hover and click to start there
-            </p>
-            <HeatmapScrubber episode={episode} onSeek={(t) => play(t)} />
-          </div>
+              <div>
+                <p className="mb-2 text-xs uppercase tracking-wide text-white/50">
+                  Most-loved moments · hover and click to start there
+                </p>
+                <HeatmapScrubber episode={episode} onSeek={(t) => play(t)} />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => play("start")}
+                  className="rounded bg-white px-5 py-2 font-semibold text-black hover:bg-white/85"
+                >
+                  ▶ Play
+                </button>
+                <button
+                  aria-label="Add to My List"
+                  onClick={(e) => e.stopPropagation()}
+                  className="grid h-10 w-10 place-items-center rounded-full border border-white/40 text-lg hover:border-white"
+                >
+                  ＋
+                </button>
+                <button
+                  aria-label="Rate thumbs up"
+                  onClick={(e) => e.stopPropagation()}
+                  className="grid h-10 w-10 place-items-center rounded-full border border-white/40 text-sm hover:border-white"
+                >
+                  👍
+                </button>
+                <button
+                  aria-label="Rate thumbs down"
+                  onClick={(e) => e.stopPropagation()}
+                  className="grid h-10 w-10 place-items-center rounded-full border border-white/40 text-sm hover:border-white"
+                >
+                  👎
+                </button>
+              </div>
+
+              {show.kind === "tv" && (
+                <EpisodeList
+                  showId={show.id}
+                  posterUrl={show.posterUrl}
+                  onPlayEpisode={(ep) => {
+                    track("play_click", {
+                      episodeId: ep.id,
+                      from: "start",
+                      t: 0,
+                      source,
+                      path: pathFor(source),
+                    });
+                    router.push(`/watch/${ep.id}?t=0`);
+                  }}
+                />
+              )}
+            </>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Episodes list with a season selector, for TV shows in the normal-browsing branch.
+// Seed seasons are sparse (e.g. Breaking Bad = 3,4,5), so seasons come from the
+// data, not a 1..N range. Hidden entirely when there's <= 1 episode.
+function EpisodeList({
+  showId,
+  posterUrl,
+  onPlayEpisode,
+}: {
+  showId: string;
+  posterUrl?: string | null;
+  onPlayEpisode: (ep: Episode) => void;
+}) {
+  const episodes = useMemo(
+    () =>
+      [...episodesForShow(showId)].sort(
+        (a, b) => a.season - b.season || a.number - b.number,
+      ),
+    [showId],
+  );
+  const seasons = useMemo(
+    () => [...new Set(episodes.map((e) => e.season))].sort((a, b) => a - b),
+    [episodes],
+  );
+  const [season, setSeason] = useState(() => seasons[0]);
+
+  if (episodes.length <= 1) return null;
+
+  const shown = episodes.filter((e) => e.season === season);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Episodes</h3>
+        {seasons.length > 1 && (
+          <select
+            value={season}
+            onChange={(e) => setSeason(Number(e.target.value))}
+            aria-label="Select season"
+            className="rounded border border-white/30 bg-[#181818] px-3 py-1.5 text-sm text-white/90 hover:border-white/60 focus:outline-none"
+          >
+            {seasons.map((s) => (
+              <option key={s} value={s}>
+                Season {s}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      <ul className="divide-y divide-white/10">
+        {shown.map((ep) => (
+          <li key={ep.id}>
+            <button
+              onClick={() => onPlayEpisode(ep)}
+              className="flex w-full items-center gap-3 rounded py-3 text-left hover:bg-white/5"
+            >
+              <div className="relative aspect-video w-28 shrink-0 overflow-hidden rounded bg-black/40">
+                {(ep.stillUrl ?? posterUrl) && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={ep.stillUrl ?? posterUrl ?? undefined}
+                    alt={ep.title}
+                    loading="lazy"
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="truncate text-sm font-semibold">
+                    S{ep.season}:E{ep.number} · {ep.title}
+                  </span>
+                  <span className="shrink-0 text-xs text-white/50">
+                    {ep.runtime} min
+                  </span>
+                </div>
+                <p className="mt-1 line-clamp-2 text-xs text-white/60">
+                  {ep.synopsis}
+                </p>
+              </div>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

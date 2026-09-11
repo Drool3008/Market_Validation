@@ -19,6 +19,21 @@ import Billboard from "@/components/Billboard";
 import Row from "@/components/Row";
 import WatchWhileYouEat from "@/components/WatchWhileYouEat";
 import DetailModal from "@/components/DetailModal";
+import GridView from "@/components/GridView";
+import SearchOverlay from "@/components/SearchOverlay";
+
+type View = "home" | "tv" | "movies" | "new" | "mylist";
+
+// "New & Hot" proxy: there is no real recency field, so rank every show's best
+// episode by show.year DESC (intentional stand-in, see task spec).
+function newAndHotItems(): CatalogItem[] {
+  return [...SHOWS]
+    .sort((a, b) => b.year - a.year)
+    .map((s) => bestEpisodeForShow(s.id))
+    .filter((e): e is NonNullable<typeof e> => Boolean(e))
+    .map((e) => toCatalogItem(e))
+    .filter((c): c is CatalogItem => Boolean(c));
+}
 
 function genreRow(genre: string): CatalogItem[] {
   return SHOWS.filter((s) => s.genres.includes(genre))
@@ -37,6 +52,9 @@ export default function Browse() {
     item: CatalogItem;
     source: string;
   } | null>(null);
+
+  const [view, setView] = useState<View>("home");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const featureEngaged = useRef(false);
   const enteredAt = useRef(0);
@@ -79,48 +97,99 @@ export default function Browse() {
   return (
     <MuteProvider>
     <div className="min-h-screen bg-nfbg pb-16">
-      <Navbar profile={profile} />
+      <Navbar
+        profile={profile}
+        activeView={view}
+        onNav={(v) => {
+          setView(v as View);
+          track("nav_click", { destination: v, path: "browse" });
+        }}
+        onOpenSearch={() => setSearchOpen(true)}
+      />
 
-      {featured && <Billboard item={featured} onSelect={handleSelect} />}
+      {view === "home" ? (
+        <>
+          {featured && <Billboard item={featured} onSelect={handleSelect} />}
 
-      <div className="relative z-10 -mt-4">
-        <Row
-          rowId="continue-watching"
-          title="Continue Watching"
-          items={continueWatching(profile)}
+          <div className="relative z-10 -mt-4">
+            <Row
+              rowId="continue-watching"
+              title="Continue Watching"
+              items={continueWatching(profile)}
+              onSelect={handleSelect}
+            />
+
+            {/* Feature under test. Placement is a validation variable (README s.10). */}
+            <WatchWhileYouEat profile={profile} onSelect={handleSelect} />
+
+            <Row
+              rowId="trending"
+              title="Trending Now"
+              items={trendingItems()}
+              onSelect={handleSelect}
+            />
+            <Row
+              rowId="movies"
+              title="Movies"
+              items={itemsByKind("movie")}
+              onSelect={handleSelect}
+            />
+            <Row
+              rowId="comedies"
+              title="Comedies"
+              items={genreRow("Comedy")}
+              onSelect={handleSelect}
+            />
+            <Row
+              rowId="crime-thriller"
+              title="Crime & Thriller"
+              items={genreRow("Thriller").length ? genreRow("Thriller") : genreRow("Crime")}
+              onSelect={handleSelect}
+            />
+          </div>
+        </>
+      ) : view === "tv" ? (
+        <GridView
+          title="TV Shows"
+          items={itemsByKind("tv")}
           onSelect={handleSelect}
+          sourcePrefix="browse-tv"
         />
-
-        {/* Feature under test. Placement is a validation variable (README s.10). */}
-        <WatchWhileYouEat profile={profile} onSelect={handleSelect} />
-
-        <Row
-          rowId="trending"
-          title="Trending Now"
-          items={trendingItems()}
-          onSelect={handleSelect}
-        />
-        <Row
-          rowId="movies"
+      ) : view === "movies" ? (
+        <GridView
           title="Movies"
           items={itemsByKind("movie")}
           onSelect={handleSelect}
+          sourcePrefix="browse-movies"
         />
-        <Row
-          rowId="comedies"
-          title="Comedies"
-          items={genreRow("Comedy")}
+      ) : view === "new" ? (
+        <GridView
+          title="New & Hot"
+          items={newAndHotItems()}
           onSelect={handleSelect}
+          sourcePrefix="browse-new"
         />
-        <Row
-          rowId="crime-thriller"
-          title="Crime & Thriller"
-          items={genreRow("Thriller").length ? genreRow("Thriller") : genreRow("Crime")}
+      ) : (
+        <GridView
+          title="My List"
+          items={[]}
           onSelect={handleSelect}
+          sourcePrefix="browse-mylist"
+          emptyText="Your list is empty. Add titles with the ＋ button."
         />
-      </div>
+      )}
 
       <DetailModal selection={selection} onClose={() => setSelection(null)} />
+
+      {searchOpen && (
+        <SearchOverlay
+          onClose={() => setSearchOpen(false)}
+          onSelect={(item, source) => {
+            handleSelect(item, source);
+            setSearchOpen(false);
+          }}
+        />
+      )}
     </div>
     </MuteProvider>
   );
