@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Answers, AnswerValue, Question } from "@/lib/survey";
 import { visibleQuestions, visibleOptions } from "@/lib/survey";
 import type { Exposure } from "@/lib/exposure";
@@ -19,6 +19,31 @@ import type { Exposure } from "@/lib/exposure";
 // displayed; the questions, their order, their options and every gate come straight
 // from lib/survey and are not touched here. Phones get short screens instead of one
 // long scroll; desktop uses the same flow in a wider column.
+
+/**
+ * Draft persistence. A participant may leave the questionnaire mid-way (back into
+ * the prototype to check something) and come back, so answers and the current
+ * screen live in sessionStorage under a caller-supplied key. sessionStorage, not
+ * local: same tab, same visit, gone when they close it -- the same lifetime as the
+ * session id the draft belongs to.
+ */
+interface Draft {
+  answers: Answers;
+  step: number;
+}
+
+function readDraft(key: string | undefined): Draft | null {
+  if (!key || typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as Partial<Draft>;
+    if (!d.answers || typeof d.answers !== "object") return null;
+    return { answers: d.answers, step: typeof d.step === "number" ? d.step : 0 };
+  } catch {
+    return null;
+  }
+}
 
 function isAnswered(q: Question, v: AnswerValue | undefined): boolean {
   if (q.type === "multi") return Array.isArray(v) && v.length > 0;
@@ -57,6 +82,8 @@ export default function SurveyForm({
   onSubmit,
   exposure = null,
   intro,
+  aside,
+  draftKey,
 }: {
   questions: Question[];
   submitLabel: string;
@@ -68,10 +95,22 @@ export default function SurveyForm({
    * ResearchNotice keeps the study framing visible throughout regardless.
    */
   intro?: React.ReactNode;
+  /** Shown above every screen (e.g. the way back into the prototype). */
+  aside?: React.ReactNode;
+  /**
+   * sessionStorage key for the in-progress draft. Omit to keep the form
+   * stateless across navigations (the pre survey, which has nowhere to wander
+   * off to). Key it by session id so a second participant on the same device
+   * never inherits the first one's half-finished answers.
+   */
+  draftKey?: string;
 }) {
-  const [answers, setAnswers] = useState<Answers>({});
+  // Restored once, on mount. Callers that pass a draftKey render this form only
+  // after mount (the post survey waits on its exposure read), so there is no
+  // server/client mismatch to hydrate.
+  const [answers, setAnswers] = useState<Answers>(() => readDraft(draftKey)?.answers ?? {});
   const [showErrors, setShowErrors] = useState(false);
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() => readDraft(draftKey)?.step ?? 0);
 
   const shown = useMemo(
     () => visibleQuestions(questions, exposure),
@@ -83,6 +122,17 @@ export default function SurveyForm({
   const stepIndex = Math.min(step, Math.max(0, steps.length - 1));
   const current = steps[stepIndex] ?? [];
   const isLast = stepIndex >= steps.length - 1;
+
+  // Persist on every change rather than on unmount: leaving for the prototype is
+  // a full navigation, which gives us no reliable unmount hook on mobile Safari.
+  useEffect(() => {
+    if (!draftKey) return;
+    try {
+      sessionStorage.setItem(draftKey, JSON.stringify({ answers, step: stepIndex }));
+    } catch {
+      /* storage unavailable: the form still works, it just will not survive a trip out */
+    }
+  }, [draftKey, answers, stepIndex]);
 
   const missing = useMemo(
     () =>
@@ -157,11 +207,19 @@ export default function SurveyForm({
     const asked = Object.fromEntries(
       shown.filter((q) => q.id in answers).map((q) => [q.id, answers[q.id]]),
     );
+    if (draftKey) {
+      try {
+        sessionStorage.removeItem(draftKey);
+      } catch {
+        /* nothing to do: a stale draft is dropped on the next submit anyway */
+      }
+    }
     onSubmit(asked);
   }
 
   return (
     <form onSubmit={handleSubmit} className="pb-28" noValidate>
+      {aside && <div className="mb-4">{aside}</div>}
       {intro && stepIndex === 0 && <div className="mb-6">{intro}</div>}
 
       <div className="mb-6">
