@@ -25,6 +25,99 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+/* Survey sliders are dragged with a thumb on a phone, so the native control is
+   too small to hit: bigger thumb + taller track, same native element (keeps the
+   built-in keyboard support and aria-value* semantics).
+
+   --fill is the answered portion, set inline per slider. Until the participant
+   interacts, the slider carries .survey-range--unset: the track is empty and the
+   thumb is hidden, so no midpoint default is ever implied on screen. The value is
+   still only recorded on a real interaction (see SurveyForm). */
+.survey-range {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  /* Generous hit area around a visually slim track. */
+  padding: 0.75rem 0;
+}
+.survey-range::-webkit-slider-runnable-track {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--nf-red) 0 var(--fill, 0%),
+    rgba(255, 255, 255, 0.15) var(--fill, 0%) 100%
+  );
+}
+.survey-range::-moz-range-track {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--nf-red) 0 var(--fill, 0%),
+    rgba(255, 255, 255, 0.15) var(--fill, 0%) 100%
+  );
+}
+.survey-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 1.75rem;
+  width: 1.75rem;
+  margin-top: -0.625rem;
+  border-radius: 9999px;
+  background: var(--nf-red);
+  border: 3px solid #fff;
+  cursor: grab;
+}
+.survey-range::-moz-range-thumb {
+  height: 1.75rem;
+  width: 1.75rem;
+  border-radius: 9999px;
+  background: var(--nf-red);
+  border: 3px solid #fff;
+  cursor: grab;
+}
+/* Unanswered: empty track, no thumb. Nothing on screen suggests a default. */
+.survey-range--unset::-webkit-slider-thumb {
+  opacity: 0;
+}
+.survey-range--unset::-moz-range-thumb {
+  opacity: 0;
+  border-color: transparent;
+  background: transparent;
+}
+.survey-range:focus-visible::-webkit-slider-thumb {
+  opacity: 1;
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+.survey-range:focus-visible::-moz-range-thumb {
+  opacity: 1;
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* Bottom action bar has to clear two things: the home indicator / notch, and the
+   always-on ResearchNotice strip that the root layout pins to bottom-0 at z-100.
+   --notice-h is that strip's rendered height; it wraps to more lines on narrow
+   screens, so it is widened there. Verified at 360px and 390px. */
+:root {
+  --notice-h: 3.5rem;
+}
+@media (min-width: 480px) {
+  :root {
+    --notice-h: 2.5rem;
+  }
+}
+@media (min-width: 720px) {
+  :root {
+    --notice-h: 1.75rem;
+  }
+}
+.safe-bottom {
+  padding-bottom: calc(var(--notice-h) + max(0.875rem, env(safe-area-inset-bottom)));
+}
+
 /* Hide scrollbars on horizontal rows, Netflix-style. */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

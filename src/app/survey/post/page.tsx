@@ -70,12 +70,12 @@ function SurveyPostInner() {
 
 function Shell({ children }: { children?: React.ReactNode }) {
   return (
-    <main className="mx-auto min-h-screen max-w-2xl px-4 py-10 pb-24">
-      <h1 className="mb-2 text-2xl font-bold text-white">Almost done</h1>
-      <p className="mb-6 text-sm text-white/50">
+    <main className="mx-auto min-h-screen w-full max-w-2xl px-5 pt-8 pb-10">
+      <h1 className="text-xl font-bold text-white">Almost done</h1>
+      <p className="mt-1 mb-5 text-sm text-white/45">
         A few questions about what you just tried.
       </p>
-      <div className="space-y-6">{children}</div>
+      <div className="space-y-5">{children}</div>
     </main>
   );
 }

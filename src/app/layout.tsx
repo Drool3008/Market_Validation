@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import ResearchNotice from "@/components/ResearchNotice";
@@ -17,6 +17,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Netflix",
   description: "Watch While You Eat - validation prototype",
+};
+
+// viewportFit: "cover" is what makes env(safe-area-inset-*) resolve to real values,
+// which the survey's fixed bottom action bar needs to clear the home indicator.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#141414",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

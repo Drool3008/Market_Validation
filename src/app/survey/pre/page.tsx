@@ -39,7 +39,7 @@ export default function SurveyPre() {
   if (screenedOut) {
     return (
       <Shell>
-        <p className="text-lg text-white/90">
+        <p className="rounded-lg border border-white/10 bg-white/[0.04] px-5 py-6 text-base leading-relaxed text-white/85">
           Thanks! This study is looking for a specific group and you&apos;re
           outside it — we appreciate your time.
         </p>
@@ -49,15 +49,17 @@ export default function SurveyPre() {
 
   return (
     <Shell>
-      <p className="rounded border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/70">
-        This is a research prototype for a student project — not the real Netflix.
-        Your responses and interactions are recorded anonymously for the study. It
-        takes a few minutes and you can stop anytime.
-      </p>
       <SurveyForm
         questions={PRE}
         submitLabel={submitting ? "Saving…" : "Start the prototype"}
         onSubmit={handleSubmit}
+        intro={
+          <p className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-relaxed text-white/60">
+            This is a research prototype for a student project — not the real
+            Netflix. Your responses and interactions are recorded anonymously for
+            the study. It takes a few minutes and you can stop anytime.
+          </p>
+        }
       />
     </Shell>
   );
@@ -65,10 +67,10 @@ export default function SurveyPre() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main className="mx-auto min-h-screen max-w-2xl px-4 py-10 pb-24">
-      <h1 className="mb-2 text-2xl font-bold text-white">Before you start</h1>
-      <p className="mb-6 text-sm text-white/50">A few quick questions.</p>
-      <div className="space-y-6">{children}</div>
+    <main className="mx-auto min-h-screen w-full max-w-2xl px-5 pt-8 pb-10">
+      <h1 className="text-xl font-bold text-white">Before you start</h1>
+      <p className="mt-1 mb-5 text-sm text-white/45">A few quick questions.</p>
+      <div className="space-y-5">{children}</div>
     </main>
   );
 }
