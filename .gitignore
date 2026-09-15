@@ -50,3 +50,6 @@ next-env.d.ts
 
 # Local Netlify folder
 .netlify
+
+# pre-launch trial data, pulled before clearing Supabase
+/data/trial-backup-*/
