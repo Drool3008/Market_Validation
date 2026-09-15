@@ -278,8 +278,10 @@ export const POST: Question[] = [
     id: "post_q9",
     type: "slider",
     required: true,
-    prompt: "How much would this improve your mealtime watching?",
-    slider: { min: 0, max: 10, minLabel: "Not at all", maxLabel: "A lot" },
+    // Likelihood to use, not magnitude of relief: the headline desirability KPI
+    // is "% who answer >= 8", so the question has to actually ask about using it.
+    prompt: "How likely are you to use this at your next meal?",
+    slider: { min: 0, max: 10, minLabel: "Not at all likely", maxLabel: "Extremely likely" },
   },
   {
     id: "post_q10",

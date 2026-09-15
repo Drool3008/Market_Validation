@@ -882,7 +882,7 @@ Administered immediately after the prototype session.
 | `post_q6` | single | yes | C4 | Would this keep you on Netflix at a meal instead of switching to something else? |
 | `post_q7` | single | yes | guardrail | Of the episodes it suggested, did they feel like things you'd want, or things you'd already skip? **(gated)** |
 | `post_q8` | multi | yes | | Which parts felt useful? **(one option gated)** |
-| `post_q9` | slider | yes | | How much would this improve your mealtime watching? |
+| `post_q9` | slider | yes | | How likely are you to use this at your next meal? |
 | `post_q10` | open | yes | | What is the ONE thing that would make you actually use it? |
 | `post_q11` | open | no | | Anything that confused you or got in the way? |
 
@@ -935,8 +935,9 @@ options and the guardrail role are unchanged.
 - That it used shows I already watch
 - None of these
 
-**`post_q9` — How much would this improve your mealtime watching?**
-Slider 0 to 10. 0 = "Not at all", 10 = "A lot".
+**`post_q9` — How likely are you to use this at your next meal?**
+Slider 0 to 10. 0 = "Not at all likely", 10 = "Extremely likely". The headline
+desirability KPI is the top box: the share answering 8 or higher.
 
 **`post_q10` — What is the ONE thing that would make you actually use it?**
 Open text, required.
@@ -1013,8 +1014,10 @@ Each `claimTag` in `src/lib/survey.ts` ties a question to a claim the study test
   finding. Compare it directly to measured time-to-first-play from the event log.
 - **`pre_q5` is a deliberate falsifier.** A high "I usually already know" share
   weakens the whole premise. It is in the instrument so the study can fail honestly.
-- **`post_q9` is the headline self-report** but it only *supports* the behavioral
-  verdict, it never replaces it.
+- **`post_q9` is the headline self-report: likelihood to use**, reported as the
+  top box (share answering >= 8). It asks about *using it again*, not how much
+  better the evening felt, so the KPI name and the question match. It only
+  *supports* the behavioral verdict, it never replaces it.
 - **`post_q7` is the Play-Something guardrail.** Netflix removed its shuffle button
   in 2023 because it re-served titles people had already rejected. A high "already
   seen / would skip" share is that same failure, and is a red flag even when the
