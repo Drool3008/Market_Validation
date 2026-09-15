@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { PROFILES } from "@/data/profiles";
 import type { DemoProfile } from "@/data/types";
 import { track, setProfileId, getSessionId, seedSessionId } from "@/lib/analytics";
+import { beginExposure } from "@/lib/exposure";
 
 // Netflix "Who's watching?" gate. The profiles are the demo personas that
 // simulate watch history (see README section 9).
@@ -21,6 +22,10 @@ export default function ProfileGate() {
     } else {
       console.warn("[survey] no ?sid= on prototype entry; unjoinable participant");
     }
+    // Open the exposure record at prototype entry, before anything can be seen.
+    // Its existence is what lets the post survey tell "did not engage" apart from
+    // "never entered the prototype" (see lib/exposure).
+    beginExposure();
     getSessionId();
     track("session_start", { ua: navigator.userAgent, w: window.innerWidth });
   }, []);

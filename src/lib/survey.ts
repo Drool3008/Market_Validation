@@ -1,5 +1,6 @@
 // Single source of truth for the pre/post questionnaire. SurveyForm renders any
 // item by its `type`. Adding or editing a question means editing ONLY this file.
+// Keep README section 18 in sync with any wording change.
 //
 // Answer value shape by type:
 //   single -> string (the chosen option)
@@ -7,6 +8,8 @@
 //   slider -> number
 //   open   -> string
 // screenOutValues: option values that, if chosen, end the study early (pre only).
+
+import type { Exposure } from "./exposure";
 
 export type QuestionType = "single" | "multi" | "slider" | "open";
 
@@ -26,6 +29,33 @@ export interface Question {
   claimTag?: string;
   required: boolean;
   screenOutValues?: string[];
+  /**
+   * Ask this only if the participant actually met the thing it asks about.
+   * Evaluated against the session's Exposure record; when there is no record
+   * (see lib/exposure) the question is shown, never silently dropped.
+   */
+  showIf?: (e: Exposure) => boolean;
+  /** Same gate, per option text, for questions where only one choice is conditional. */
+  optionShowIf?: Record<string, (e: Exposure) => boolean>;
+}
+
+/** Questions to render for this session. A null exposure record shows everything. */
+export function visibleQuestions(
+  questions: Question[],
+  exposure: Exposure | null,
+): Question[] {
+  if (!exposure) return questions;
+  return questions.filter((q) => !q.showIf || q.showIf(exposure));
+}
+
+/** Options to render for one question. A null exposure record shows everything. */
+export function visibleOptions(q: Question, exposure: Exposure | null): string[] {
+  const all = q.options ?? [];
+  if (!exposure || !q.optionShowIf) return all;
+  return all.filter((opt) => {
+    const gate = q.optionShowIf?.[opt];
+    return !gate || gate(exposure);
+  });
 }
 
 export type AnswerValue = string | string[] | number;
@@ -173,7 +203,10 @@ export const POST: Question[] = [
     id: "post_q3",
     type: "slider",
     required: true,
-    prompt: "How well did the suggested episodes match your taste?",
+    // Scoped to what they were actually shown: pilot testers rated the thin demo
+    // set rather than the concept. Only asked of people who opened the picks.
+    showIf: (e) => e.clickedFeature,
+    prompt: "How well did the episodes it showed you match your taste?",
     slider: { min: 1, max: 5, minLabel: "Not at all", maxLabel: "Very well" },
   },
   {
@@ -206,8 +239,9 @@ export const POST: Question[] = [
     type: "single",
     required: true,
     claimTag: "guardrail",
+    showIf: (e) => e.clickedFeature,
     prompt:
-      "Did the suggestions feel like things you'd want, or things you'd already skip?",
+      "Of the episodes it suggested, did they feel like things you'd want, or things you'd already skip?",
     options: [
       "Mostly things I'd want",
       "A mix",
@@ -226,6 +260,11 @@ export const POST: Question[] = [
       "That it used shows I already watch",
       "None of these",
     ],
+    // Do not ask people to rate a mechanic they never encountered. Most phone
+    // testers never reached the graph before it was made tappable.
+    optionShowIf: {
+      "The jump-to-the-best-moment graph": (e) => e.sawHeatmap || e.usedHeatmap,
+    },
   },
   {
     id: "post_q9",

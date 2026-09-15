@@ -155,7 +155,7 @@ export default function DetailModal({
 
               <div>
                 <p className="mb-2 text-xs uppercase tracking-wide text-white/50">
-                  Most-loved moments · hover and click to start there
+                  Most-loved moments · tap or hover the curve to start there
                 </p>
                 <HeatmapScrubber episode={episode} onSeek={(t) => play(t)} />
               </div>

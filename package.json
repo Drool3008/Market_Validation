@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "check": "tsx scripts/check-study-invariants.ts",
     "crawl": "tsx crawler/crawl.ts"
   },
   "dependencies": {

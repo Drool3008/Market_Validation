@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import type { CatalogItem } from "@/data/types";
 import { track, pathFor } from "@/lib/analytics";
+import { markExposure } from "@/lib/exposure";
 import TitleCard from "./TitleCard";
 
 // A horizontal catalog row. Fires row_impression once when scrolled into view,
@@ -61,6 +62,9 @@ export default function Row({
       episodeId: item.episode.id,
       path: pathFor(source),
     });
+    // Opening a pick from the feature row is what "saw the picks" means: it gates
+    // the post-survey questions that ask them to judge those picks.
+    if (isFeature) markExposure("clickedFeature");
     onSelect(item, source);
   }
 

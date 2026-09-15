@@ -1,13 +1,19 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { POST, type Answers } from "@/lib/survey";
 import { newSessionId, saveSurvey } from "@/lib/survey-client";
+import { readExposure, type Exposure } from "@/lib/exposure";
 import SurveyForm from "@/components/SurveyForm";
 
 // Post-visit form. Reads sid from the URL (?sid=) to join the pre survey + events.
 // If missing, mint one and warn: this participant can't be joined to their session.
+//
+// Questions about things the participant may never have met (the picks, the
+// best-moment graph) are gated on the session's Exposure record. That record lives
+// in sessionStorage, so it can only be read after mount -- rendering the form
+// before then would hydrate with the wrong set of questions.
 export default function SurveyPost() {
   return (
     <Suspense fallback={<Shell />}>
@@ -32,6 +38,15 @@ function SurveyPostInner() {
 
   const [submitting, setSubmitting] = useState(false);
 
+  // undefined = not read yet (pre-mount), null = no prototype session on record
+  // (direct link / cleared storage) which falls back to asking everything.
+  const [exposure, setExposure] = useState<Exposure | null | undefined>(undefined);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setExposure(readExposure());
+  }, []);
+
   async function handleSubmit(answers: Answers) {
     if (submitting) return;
     setSubmitting(true);
@@ -39,10 +54,13 @@ function SurveyPostInner() {
     router.push("/survey/thanks");
   }
 
+  if (exposure === undefined) return <Shell />;
+
   return (
     <Shell>
       <SurveyForm
         questions={POST}
+        exposure={exposure}
         submitLabel={submitting ? "Saving…" : "Submit feedback"}
         onSubmit={handleSubmit}
       />

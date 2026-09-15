@@ -51,6 +51,7 @@ Walk the full participant flow from `http://localhost:3000/survey/pre`.
 | `pnpm build` | Production build |
 | `pnpm start` | Serve the production build |
 | `pnpm lint` | ESLint |
+| `pnpm check` | Study invariants self-check (feature-row size, survey gating) |
 | `pnpm crawl` | Re-scrape the catalog (offline, one-shot, needs `TMDB_BEARER`) |
 
 **Database:** apply the migrations in `supabase/migrations/`, `0001_events.sql` then
@@ -64,6 +65,7 @@ Smoke test after deploy: `/report` shows `store: supabase`.
 
 | Route | Is |
 |---|---|
+| `/survey/start` | Feature-blind intro: task, duration, consent, meal scenario. **Give participants this link.** |
 | `/survey/pre` | Pre-visit form, mints the `session_id`, screens participants |
 | `/?sid=<session_id>` | Profile gate ("Who's watching?"), seeds the session id |
 | `/browse` | The Netflix home: billboard, rows, WWYE row, nav, search, detail modal |
@@ -176,9 +178,14 @@ catalog rows, and behaves like this:
 4. **Start-anywhere with a "best moment" graph.** The user does not have to rewatch
    the whole episode. On the detail modal they get two options:
    - **Start from the beginning**, or
-   - Use a **YouTube-style engagement graph** over the scrubber. Hovering the
-     timeline shows a curve peaking at the most-loved scene plus a thumbnail,
-     clicking jumps playback to that moment.
+   - Use a **YouTube-style engagement graph** over the scrubber. Hovering (desktop)
+     or tapping (touch) the timeline reveals a curve peaking at the most-loved
+     scene plus an episode thumbnail, and commits playback to that moment.
+     Touch was added after pilot testing: phones have no hover, so the target
+     audience could not reach the mechanic at all. A tap seeks to the tapped
+     point, the same decision a click makes, so `scrubber_interact.t` means "the
+     moment they chose" on both. Peak-jumping stays the separate
+     "Jump to the Best Moment" button's job.
 
    The heatmap curve is **dummy/synthetic data** in the demo (confirmed scope),
    shaped to look believable, with a clear peak at the "best moment".
@@ -339,6 +346,11 @@ episode lists, and per-episode ratings.
 **Derived, not stored:** the "most-loved" episode per show is computed at runtime by
 `bestEpisodeForShow()` (max `rating`). There is no `is_most_loved` column.
 
+**Feature row size:** each demo profile carries 14 shows, so the WWYE row renders 14
+picks before mood filtering. Pilot testers shown a ~4-item row judged the thin set
+rather than the concept, which is a measurement problem, not a taste finding.
+`pnpm check` asserts every profile stays at 10 or more.
+
 **Output:** a static JSON seed committed to the repo. The app never depends on the
 crawler being live, and the crawler never runs in the request path.
 
@@ -438,6 +450,25 @@ feature is measured against exists in every session.
 `session_id` per visit, held in `sessionStorage`, seeded from `?sid=` when present.
 Never blocks the UI on a network write.
 
+### 8.4 Exposure flags (not events)
+
+The post survey must not ask people to rate things they never met. What the
+participant actually encountered is recorded in `sessionStorage` by
+`src/lib/exposure.ts`, alongside the session id, **not** in the `events` table: the
+survey needs it synchronously at render time and the event schema is frozen.
+
+| Flag | Set when |
+|---|---|
+| `clickedFeature` | A title is opened from the Watch While You Eat row |
+| `sawHeatmap` | The best-moment graph is rendered in front of them |
+| `usedHeatmap` | They hover, tap, or key into the graph |
+
+The record is **created empty at prototype entry** (the profile gate). That is what
+separates "we know they did not do it" (record exists, flag false) from "we have no
+idea" (no record: direct link to `/survey/post`, fresh tab, cleared storage). No
+record falls back to asking every question, so a guardrail answer is never silently
+dropped. See [Section 18.3](#183-conditional-questions).
+
 > **Known operational hazard.** `src/app/api/events/route.ts` wraps the store write
 > in `catch {}` and returns `{ok: true}` regardless. A Supabase outage, a paused
 > project, or a rotated key therefore produces **silent** event loss: the
@@ -454,12 +485,17 @@ profiles** (`src/data/profiles.ts`). On launch the tester picks a Netflix-style
 profile, each profile has a fixed fake watch history (`historyShowIds`) that drives
 the feature row.
 
-| Profile | Feature row emphasis |
-|---|---|
-| The Sitcom Unwinder | cozy / funny best episodes |
-| The Crime Junkie | tense / gripping best episodes |
-| The Prestige Bingeing | dramatic best episodes |
-| The Comfort Rewatcher | feel-good best episodes |
+| Profile | Shows | Feature row emphasis |
+|---|---|---|
+| The Sitcom Unwinder | 14 | cozy / funny best episodes |
+| The Crime Junkie | 14 | tense / gripping best episodes |
+| The Prestige Bingeing | 14 | dramatic best episodes |
+| The Comfort Rewatcher | 14 | feel-good best episodes |
+
+Every entry is on-persona: the lists are sized for a realistic shelf, never padded
+with low-rated or off-profile titles. A mood chip that matches nothing in a given
+profile (no cozy picks for a crime fan) shows the row's empty-state message, which
+is intended.
 
 Each profile maps to a set of shows. The "Watch While You Eat" row is filled with
 the **best episode** of each of those shows, filterable by mood, sorted by rating
@@ -612,6 +648,7 @@ Market_Validation/
 │   │   ├── page.tsx               # profile gate ("Who's watching?"), seeds sid
 │   │   ├── browse/page.tsx        # home: rows, nav views, search, modal host
 │   │   ├── watch/[episodeId]/     # mock player + heatmap scrubber
+│   │   ├── survey/start           # feature-blind intro (give participants this)
 │   │   ├── survey/pre|post|thanks # questionnaire flow
 │   │   ├── report/page.tsx        # internal validation dashboard
 │   │   └── api/events|survey/     # POST sinks (Node runtime)
@@ -626,6 +663,7 @@ Market_Validation/
 │   │   └── FinishFeedback.tsx     # always-available link to the post survey
 │   ├── lib/
 │   │   ├── analytics.ts           # track(), session id, pathFor()
+│   │   ├── exposure.ts            # what the participant actually saw (gates survey)
 │   │   ├── events-store.ts        # Supabase REST write, JSONL fallback
 │   │   ├── survey.ts              # THE QUESTIONNAIRE (source of truth)
 │   │   ├── survey-client.ts       # posts survey answers
@@ -644,6 +682,8 @@ Market_Validation/
 │   ├── crawl.ts                   # TMDB scrape, needs TMDB_BEARER
 │   ├── shows.ts                   # the show list to crawl
 │   └── mood.ts                    # mood tagging layer
+├── scripts/
+│   └── check-study-invariants.ts  # `pnpm check`: row size + survey gating asserts
 ├── data/events.jsonl              # local fallback event store (no Supabase)
 ├── supabase/migrations/
 │   ├── 0001_events.sql
@@ -682,10 +722,19 @@ so **stated** answers (survey) can be cross-checked against **revealed** behavio
 (events):
 
 ```
-/survey/pre  →  /?sid=…  →  /browse  →  /survey/post?sid=…  →  /survey/thanks
+/survey/start  →  /survey/pre  →  /?sid=…  →  /browse  →  /survey/post?sid=…  →  /survey/thanks
 ```
 
-1. **Pre survey (`/survey/pre`)** — consent notice plus problem-validation
+**Give participants the `/survey/start` link, not `/survey/pre`.** Entering at the
+pre form skips the framing and the session still works, but the participant has no
+idea what they are about to do.
+
+1. **Intro (`/survey/start`)** — what they will do, how long it takes, the
+   anonymity line, and the mealtime scenario. **Feature-blind by design:** it never
+   names or points at the WWYE row, because telling someone what is being tested
+   destroys the behavioural signal (README [Section 20.4](#204-session-protocol-four-parts-every-session)).
+   Static page, no session id minted here. A single "Start" proceeds to the pre form.
+2. **Pre survey (`/survey/pre`)** — consent notice plus problem-validation
    questions. On first load it mints a `session_id` (UUID v4). Required-field and
    "slider must be moved" validation gate the submit button until the form is
    complete.
@@ -693,12 +742,13 @@ so **stated** answers (survey) can be cross-checked against **revealed** behavio
      save the response with `screened_out = true`. The prototype is not reachable
      from there. Screen-out options are marked in
      [Section 18](#18-the-questionnaire-shipped-verbatim).
-2. **Prototype (`/?sid=<session_id>`)** — the profile gate, then `/browse`. The
+3. **Prototype (`/?sid=<session_id>`)** — the profile gate, then `/browse`. The
    `sid` from the URL seeds the client session so every `events` row logs under that
    same id. An always-available **"Finish & give feedback"** button links to the
    post survey, so participants who abandon before the player still reach it.
-3. **Post survey (`/survey/post?sid=…`)** — solution-validation questions, then
-   `/survey/thanks`.
+4. **Post survey (`/survey/post?sid=…`)** — solution-validation questions, then
+   `/survey/thanks`. Questions about things the participant may never have met are
+   gated, see [Section 18.3](#183-conditional-questions).
 
 **Storage & join.** Pre/post responses go to `survey_responses` (via `/api/survey`),
 prototype events go to `events` (via `/api/events`). All three carry the same
@@ -819,12 +869,12 @@ Administered immediately after the prototype session.
 |---|---|---|---|---|
 | `post_q1` | single | yes | | Did you notice a row meant to help you quickly pick something to watch? |
 | `post_q2` | single | yes | C2 | Compared to how you normally decide at a meal, finding something with the 'Watch While You Eat' row was… |
-| `post_q3` | slider | yes | | How well did the suggested episodes match your taste? |
+| `post_q3` | slider | yes | | How well did the episodes it showed you match your taste? **(gated)** |
 | `post_q4` | single | yes | C3 | If that had been a real meal just now, would you have started watching — or given up? |
 | `post_q5` | single | yes | | Did it reduce the 'what do I put on' struggle for you specifically? |
 | `post_q6` | single | yes | C4 | Would this keep you on Netflix at a meal instead of switching to something else? |
-| `post_q7` | single | yes | guardrail | Did the suggestions feel like things you'd want, or things you'd already skip? |
-| `post_q8` | multi | yes | | Which parts felt useful? |
+| `post_q7` | single | yes | guardrail | Of the episodes it suggested, did they feel like things you'd want, or things you'd already skip? **(gated)** |
+| `post_q8` | multi | yes | | Which parts felt useful? **(one option gated)** |
 | `post_q9` | slider | yes | | How much would this improve your mealtime watching? |
 | `post_q10` | open | yes | | What is the ONE thing that would make you actually use it? |
 | `post_q11` | open | no | | Anything that confused you or got in the way? |
@@ -842,8 +892,10 @@ Administered immediately after the prototype session.
 - About the same
 - Slower
 
-**`post_q3` — How well did the suggested episodes match your taste?**
+**`post_q3` — How well did the episodes it showed you match your taste?**
 Slider 1 to 5. 1 = "Not at all", 5 = "Very well".
+Gated on `clickedFeature`. Reworded to scope it to what they were actually shown:
+pilot testers rated the thin demo set rather than the concept.
 
 **`post_q4` — If that had been a real meal just now, would you have started watching — or given up?**
 - Started easily
@@ -861,15 +913,18 @@ Slider 1 to 5. 1 = "Not at all", 5 = "Very well".
 - No
 - I'd still switch
 
-**`post_q7` — Did the suggestions feel like things you'd want, or things you'd already skip?**
+**`post_q7` — Of the episodes it suggested, did they feel like things you'd want, or things you'd already skip?**
 - Mostly things I'd want
 - A mix
 - Mostly things I've already seen or would skip
 
+Gated on `clickedFeature`. Reworded for the same reason as `post_q3`; the three
+options and the guardrail role are unchanged.
+
 **`post_q8` — Which parts felt useful?** (select all)
 - The single best-episode pick per show
 - The mood filters
-- The jump-to-the-best-moment graph
+- The jump-to-the-best-moment graph *(shown only if `sawHeatmap` or `usedHeatmap`)*
 - That it used shows I already watch
 - None of these
 
@@ -882,7 +937,34 @@ Open text, required.
 **`post_q11` — Anything that confused you or got in the way?**
 Open text, optional.
 
-### 18.3 Answer value shapes
+### 18.3 Conditional questions
+
+Three items are gated on what the participant actually encountered, using the
+exposure flags in [Section 8.4](#84-exposure-flags-not-events). Nobody is asked to
+judge something they never saw.
+
+| Item | Shown only if | Why |
+|---|---|---|
+| `post_q3` | `clickedFeature` | Cannot rate picks you never opened |
+| `post_q7` | `clickedFeature` | Same, and a forced guess pollutes the guardrail |
+| `post_q8` option "The jump-to-the-best-moment graph" | `sawHeatmap` or `usedHeatmap` | Most phone testers never reached the graph |
+
+**Mechanism.** `Question` carries an optional `showIf: (e: Exposure) => boolean` and
+an optional `optionShowIf: Record<string, (e: Exposure) => boolean>`.
+`visibleQuestions()` and `visibleOptions()` in `src/lib/survey.ts` resolve them, and
+`SurveyForm` applies both generically: a gated-out item is never rendered, never
+counted in the progress bar, never required, and never submitted. Adding another
+conditional question means adding a `showIf` line, nothing else.
+
+**No exposure record means show everything.** A participant who reaches
+`/survey/post` without a prototype session on record gets the full instrument.
+
+**"Not asked" is not "skipped".** Only questions that were actually shown are
+submitted, so a gated-out question is *absent* from `survey_responses.answers`
+rather than present and blank. Analysis must treat a missing `post_q3`/`post_q7` key
+as "not exposed", not as a non-response.
+
+### 18.4 Answer value shapes
 
 | Type | Stored as |
 |---|---|
@@ -973,10 +1055,12 @@ plainly as a limitation in the report, not hidden.
 
 ### 20.4 Session protocol (four parts, every session)
 
-1. **Screen.** Confirm eligibility with the pre-visit form. Ineligible respondents
-   stop there automatically.
-2. **Frame the moment.** Read the scenario aloud so the participant is in the
-   mealtime headspace. Do **not** name or point to the feature being tested.
+1. **Screen.** Send them to `/survey/start`. The intro frames the task and the meal
+   scenario without naming the feature, then the pre-visit form decides
+   eligibility. Ineligible respondents stop there automatically.
+2. **Frame the moment.** The intro screen carries the scenario in writing; read it
+   aloud too in a moderated session so the participant is in the mealtime headspace.
+   Do **not** name or point to the feature being tested.
 3. **Observe.** The participant uses the prototype naturally while the
    instrumentation captures the funnel and the feature-vs-generic baseline. In
    moderated sessions, note every hesitation and skip.
@@ -1075,8 +1159,9 @@ first, it does not change code.
 **Steps**
 1. **Inventory.** Map the repo against [Section 15](#15-repo-structure). List what
    exists, what is missing, anything extra.
-2. **Build health.** Run install, `pnpm lint`, `npx tsc --noEmit`, `pnpm build`.
-   Record failures verbatim.
+2. **Build health.** Run install, `pnpm lint`, `npx tsc --noEmit`, `pnpm build`, and
+   `pnpm check`. Record failures verbatim. `pnpm check` asserts the feature-row size
+   and the survey gating, which a type-check cannot see.
 3. **Data model.** Check `supabase/migrations/` against
    [Section 8](#8-instrumentation--event-schema). Confirm `survey_responses` accepts
    an anon insert and that `events` is server-only.
@@ -1092,7 +1177,11 @@ first, it does not change code.
    [Section 18](#18-the-questionnaire-shipped-verbatim) renders with the exact
    prompt, type, options, and required flag from `src/lib/survey.ts`. Confirm each
    screen-out option actually ends the study and writes `screened_out = true`.
-   Confirm validation blocks submit on an untouched slider.
+   Confirm validation blocks submit on an untouched slider. Then walk the post
+   survey twice, once having opened a WWYE pick and used the graph, once having
+   ignored the row entirely, and confirm the gated items in
+   [Section 18.3](#183-conditional-questions) appear and disappear accordingly, and
+   that the stored `answers` object omits the keys that were never asked.
 6. **The join.** Walk the full flow in a browser and confirm the URL `sid`, the
    value in `sessionStorage`, the Finish-and-feedback link, the two
    `survey_responses` rows, and every `events` row all carry **one** `session_id`.
@@ -1100,7 +1189,11 @@ first, it does not change code.
 7. **Report.** Confirm `/report` computes the WWYE funnel, feature-vs-baseline CTR,
    dwell, bounce, and the path comparison, and that thresholds are read from
    `src/lib/report-config.ts` rather than hard-coded.
-8. **Responsive & ethics.** Spot-check desktop, tablet, and mobile widths, the
+8. **Touch.** On a mobile viewport, open a WWYE title and confirm a tap on the
+   best-moment graph reveals the curve plus thumbnail and seeks to the tapped point,
+   firing exactly one `scrubber_interact` (a tap also emits a synthesized click, so
+   a double row here is a real bug).
+9. **Responsive & ethics.** Spot-check desktop, tablet, and mobile widths, the
    pseudonymous-only rule, and the research-prototype notice.
 
 **Output** — a single structured report: summary verdict in one line, a scorecard

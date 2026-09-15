@@ -2,10 +2,17 @@
 
 import { useMemo, useState } from "react";
 import type { Answers, AnswerValue, Question } from "@/lib/survey";
+import { visibleQuestions, visibleOptions } from "@/lib/survey";
+import type { Exposure } from "@/lib/exposure";
 
 // One config-driven form. Renders any Question by its `type`; adding a question
 // means editing src/lib/survey.ts only. Validation: required items block submit,
 // sliders start UNSET (must be moved), inline errors, submit disabled until valid.
+//
+// Questions and single options may declare a `showIf` gate (see lib/survey). The
+// filtering is generic and happens here once: a gated-out question is never
+// rendered, never counted in progress, never required, and never submitted.
+// `exposure: null` (no prototype session on record) shows everything.
 
 function isAnswered(q: Question, v: AnswerValue | undefined): boolean {
   if (q.type === "multi") return Array.isArray(v) && v.length > 0;
@@ -18,25 +25,32 @@ export default function SurveyForm({
   questions,
   submitLabel,
   onSubmit,
+  exposure = null,
 }: {
   questions: Question[];
   submitLabel: string;
   onSubmit: (answers: Answers) => void;
+  exposure?: Exposure | null;
 }) {
   const [answers, setAnswers] = useState<Answers>({});
   const [showErrors, setShowErrors] = useState(false);
 
+  const shown = useMemo(
+    () => visibleQuestions(questions, exposure),
+    [questions, exposure],
+  );
+
   const missing = useMemo(
     () =>
       new Set(
-        questions
+        shown
           .filter((q) => q.required && !isAnswered(q, answers[q.id]))
           .map((q) => q.id),
       ),
-    [questions, answers],
+    [shown, answers],
   );
 
-  const answeredCount = questions.filter((q) => isAnswered(q, answers[q.id])).length;
+  const answeredCount = shown.filter((q) => isAnswered(q, answers[q.id])).length;
   const valid = missing.size === 0;
 
   function set(id: string, value: AnswerValue) {
@@ -59,7 +73,12 @@ export default function SurveyForm({
       setShowErrors(true);
       return;
     }
-    onSubmit(answers);
+    // Submit only what was actually asked, so a gated-out question is absent
+    // rather than blank -- "not asked" and "skipped" must stay distinguishable.
+    const asked = Object.fromEntries(
+      shown.filter((q) => q.id in answers).map((q) => [q.id, answers[q.id]]),
+    );
+    onSubmit(asked);
   }
 
   return (
@@ -71,15 +90,15 @@ export default function SurveyForm({
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
           <div
             className="h-full rounded-full bg-nfred transition-all"
-            style={{ width: `${(answeredCount / questions.length) * 100}%` }}
+            style={{ width: `${(answeredCount / Math.max(1, shown.length)) * 100}%` }}
           />
         </div>
         <p className="mt-1 text-right text-xs text-white/50">
-          {answeredCount} / {questions.length}
+          {answeredCount} / {shown.length}
         </p>
       </div>
 
-      {questions.map((q, i) => {
+      {shown.map((q, i) => {
         const invalid = showErrors && missing.has(q.id);
         const errorId = `${q.id}-error`;
         return (
@@ -99,6 +118,7 @@ export default function SurveyForm({
 
             <QuestionInput
               q={q}
+              options={visibleOptions(q, exposure)}
               value={answers[q.id]}
               onSingle={(v) => set(q.id, v)}
               onMulti={(opt) => toggleMulti(q.id, opt)}
@@ -137,6 +157,7 @@ export default function SurveyForm({
 
 function QuestionInput({
   q,
+  options,
   value,
   onSingle,
   onMulti,
@@ -144,6 +165,7 @@ function QuestionInput({
   onOpen,
 }: {
   q: Question;
+  options: string[];
   value: AnswerValue | undefined;
   onSingle: (v: string) => void;
   onMulti: (opt: string) => void;
@@ -153,7 +175,7 @@ function QuestionInput({
   if (q.type === "single") {
     return (
       <div className="space-y-2">
-        {q.options?.map((opt) => (
+        {options.map((opt) => (
           <label
             key={opt}
             className="flex cursor-pointer items-center gap-3 rounded border border-white/15 px-4 py-3 text-white/90 transition hover:border-white/40 has-checked:border-nfred has-checked:bg-nfred/10"
@@ -177,7 +199,7 @@ function QuestionInput({
     const selected = Array.isArray(value) ? value : [];
     return (
       <div className="space-y-2">
-        {q.options?.map((opt) => (
+        {options.map((opt) => (
           <label
             key={opt}
             className="flex cursor-pointer items-center gap-3 rounded border border-white/15 px-4 py-3 text-white/90 transition hover:border-white/40 has-checked:border-nfred has-checked:bg-nfred/10"
