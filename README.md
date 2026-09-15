@@ -778,7 +778,7 @@ scale), `open` (free text). `claimTag` links a question to a hypothesis claim, s
 
 ### 18.1 Pre-visit form
 
-Three screeners, then eight baseline questions. A screen-out answer ends the study
+Four screener questions (three of them screen out), then eight baseline questions. A screen-out answer ends the study
 immediately and saves the row with `screened_out = true`.
 
 | id | Type | Req | Claim | Prompt |
@@ -786,6 +786,7 @@ immediately and saves the row with `screened_out = true`.
 | `pre_s1` | single | yes | | How old are you? |
 | `pre_s2` | single | yes | | How often do you watch shows or movies on a streaming app? |
 | `pre_s3` | single | yes | | Do you watch something while eating a meal? |
+| `pre_s4` | multi | yes | | Where do you usually watch during meals? Pick every one you use. |
 | `pre_q1` | single | yes | C1 | In a typical week, how many times do you watch something on a streaming app while eating a meal? |
 | `pre_q2` | single | yes | C2 | Think about the last time you watched during a meal. How long did you spend deciding before you actually started? |
 | `pre_q3` | slider | yes | C2 | By the time you settled on something, how much of your meal was already over? |
@@ -816,6 +817,12 @@ immediately and saves the row with `screened_out = true`.
 - Sometimes
 - Rarely
 - Never **(screen out)**
+
+**`pre_s4` — Where do you usually watch during meals? Pick every one you use.** (multi)
+- Phone
+- Laptop
+- TV
+- Tablet
 
 **`pre_q1` — In a typical week, how many times do you watch something on a streaming app while eating a meal?**
 - 0 **(screen out)**

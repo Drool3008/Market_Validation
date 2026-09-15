@@ -93,6 +93,14 @@ export const PRE: Question[] = [
     screenOutValues: ["Never"],
   },
   {
+    id: "pre_s4",
+    type: "multi",
+    required: true,
+    prompt:
+      "Where do you usually watch during meals? Pick every one you use.",
+    options: ["Phone", "Laptop", "TV", "Tablet"],
+  },
+  {
     id: "pre_q1",
     type: "single",
     required: true,
