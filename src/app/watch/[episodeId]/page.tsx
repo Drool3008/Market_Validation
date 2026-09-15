@@ -100,6 +100,13 @@ function WatchInner() {
         <p className="mt-2 text-sm text-white/40">
           {startT > 0 ? `Started at the most-loved moment · ${formatTime(startT)}` : "Playing from the start"}
         </p>
+        {/* Both entry points (start from the beginning, jump to the best moment)
+            land here, so one notice covers both. Says the quiet part out loud:
+            testers kept waiting for video that was never coming. */}
+        <p className="mx-auto mt-4 max-w-sm rounded-md border border-white/15 bg-white/[0.06] px-3 py-2 text-xs leading-relaxed text-white/55">
+          Placeholder player — no video actually plays in this prototype. The
+          timeline below is running as if the episode had started here.
+        </p>
         {sid && (
           <a
             href={`/survey/post?sid=${sid}`}
