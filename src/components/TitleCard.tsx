@@ -188,6 +188,15 @@ export default function TitleCard({
               )}
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#181818] via-transparent to-transparent" />
               <span className="absolute bottom-2 left-3 text-lg font-extrabold drop-shadow">{show.title}</span>
+              {/* Whole art area (title included) opens the title, same as ▶.
+                  Transparent overlay instead of an onClick on the media div so it
+                  stays a real, focusable button without nesting one inside another.
+                  Sits before MuteButton so the speaker keeps the top layer. */}
+              <button
+                onClick={() => onSelect(item, rowId)}
+                aria-label={`Open ${show.title}`}
+                className="absolute inset-0 cursor-pointer"
+              />
               {trailers.length > 0 && <MuteButton className="absolute bottom-2 right-3 h-8 w-8" />}
             </div>
 
